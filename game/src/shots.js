@@ -111,23 +111,43 @@ export function stageShot(name, seed) {
   if (name === 'win') {
     for (const candidate of WIN_SEEDS) {
       const game = runDuel(candidate, 'sharp');
-      if (game.phase === 'over' && game.winner === 'player') return { screen: SCREEN_OVER, game };
+      if (game.phase === 'over' && game.winner === 'player') { game.fx = []; return { screen: SCREEN_OVER, game }; }
     }
     const game = runDuel(WIN_SEEDS[0], 'sharp');
+    game.fx = [];
     return { screen: game.phase === 'over' ? SCREEN_OVER : SCREEN_PLAY, game };
   }
   if (name === 'loss') {
     for (const candidate of LOSS_SEEDS) {
       const game = runDuel(candidate, 'weak');
-      if (game.phase === 'over' && game.winner === 'ai') return { screen: SCREEN_OVER, game };
+      if (game.phase === 'over' && game.winner === 'ai') { game.fx = []; return { screen: SCREEN_OVER, game }; }
     }
     const game = runDuel(LOSS_SEEDS[0], 'weak');
+    game.fx = [];
     return { screen: game.phase === 'over' ? SCREEN_OVER : SCREEN_PLAY, game };
   }
   if (name === 'play') {
-    // Four rounds in: both boards populated, three cards in hand, life
-    // 21 vs 17 — a mid-duel that actually shows the game.
-    const game = runMidDuel(seed || 5, 4);
+    // A mid-duel cover needs a FULL board: at least 4 creatures, both
+    // sides present, still in play. The sharp player empties its hand
+    // and combat thins the board, so try the requested seed at 6, 5 and
+    // 4 rounds, then a fixed fallback list — first match wins, so the
+    // frame is deterministic. Floating damage text is cleared: fx are a
+    // live animation that the shot renderer draws once, so every "-N"
+    // from earlier rounds would freeze onto the static frame.
+    const base = seed || 118;
+    const tries = [[base, 6], [base, 5], [base, 4]];
+    for (const s of [118, 81, 23, 54, 50]) for (const r of [6, 5, 4]) tries.push([s, r]);
+    for (const [s, rounds] of tries) {
+      const game = runMidDuel(s, rounds);
+      const ai = game.ai.lanes.flat().length;
+      const pl = game.player.lanes.flat().length;
+      if (game.phase === 'play' && ai >= 1 && pl >= 1 && ai + pl >= 4) {
+        game.fx = [];
+        return { screen: SCREEN_PLAY, game };
+      }
+    }
+    const game = runMidDuel(base, 4);
+    game.fx = [];
     return { screen: SCREEN_PLAY, game };
   }
   const game = createGame(seed || 3);

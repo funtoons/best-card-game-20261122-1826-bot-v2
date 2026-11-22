@@ -4,6 +4,7 @@
 // only during play, never under a win/loss overlay.
 import { FIELD, PALETTE, STAT, FONT, FONT_UI, LANES, SURGE_MAX } from './config.js';
 import { ELEMENTS } from './cards.js';
+import { mulberry32 } from './random.js';
 import { effectiveAtk, resonanceBonus } from './engine.js';
 
 const LANE_X = [24, 440, 856];
@@ -201,17 +202,22 @@ export function drawCard(ctx, card, x, y, w, h, opts = {}) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(el.name.toUpperCase(), x + w / 2, y + 11);
-  // Cost gem: a white diamond with a gold edge, top-left, clear of the art.
-  diamond(ctx, x + 20, y + 34, 15, STAT.costFill, STAT.costEdge);
-  ctx.fillStyle = STAT.costInk;
-  ctx.font = `bold 16px ${FONT_UI}`;
-  ctx.fillText(String(card.cost), x + 20, y + 35);
   // Unique art in a light tint of the element.
   const artY = y + 22;
   const artH = Math.max(28, Math.round(h * 0.3));
   ctx.fillStyle = el.light;
   ctx.fillRect(x + 8, artY, w - 16, artH);
   drawArt(ctx, card.art, x + w / 2, artY + artH / 2, Math.min(artH * 0.62, 52), el.color);
+  // Cost gem, drawn AFTER the art: a white diamond with a gold edge,
+  // top-left, number in dark ink. The gem IS the card's cost in Kindle
+  // and must read on every card, spells included. v2 drew it BEFORE the
+  // art rect, so the art painted over it and only a gold sliver stuck
+  // out at the card edge — the meaningless orange glyph in the corner.
+  const gemR = h >= 170 ? 15 : 12;
+  diamond(ctx, x + 20, y + 34, gemR, STAT.costFill, STAT.costEdge);
+  ctx.fillStyle = STAT.costInk;
+  ctx.font = `bold ${h >= 170 ? 16 : 13}px ${FONT_UI}`;
+  ctx.fillText(String(card.cost), x + 20, y + 35);
   // Name below the art. On small board cards that is all the text there is
   // room for: the rules text only fits on the large hand cards, where it
   // gets its own padded box clear of the stat strip. v1 squeezed rules
@@ -452,6 +458,22 @@ function drawLane(ctx, game, lane) {
     const selected = game.selected >= 0 && game.selectedLane === lane;
     drawCard(ctx, shown, cx, 292, BOARD_CARD.w, BOARD_CARD.h, { selected });
   });
+  // Ownership divider: the gap between the AI row (bottom y=270) and the
+  // player row (top y=292) carries a dashed line and two labels, so which
+  // half belongs to whom never has to be guessed from position alone.
+  ctx.strokeStyle = 'rgba(217,164,65,0.45)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(x + 10, 282); ctx.lineTo(x + LANE_W - 10, 282); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = `bold 10px ${FONT_UI}`;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = PALETTE.goldBright;
+  ctx.textAlign = 'left';
+  ctx.fillText('LAWAN', x + 12, 276);
+  ctx.textAlign = 'right';
+  ctx.fillText('KAMU', x + LANE_W - 12, 276);
+  ctx.textAlign = 'center';
   if (game.selected >= 0 && game.selectedLane === lane) {
     ctx.strokeStyle = PALETTE.goldBright;
     ctx.lineWidth = 3;
@@ -481,7 +503,9 @@ export function drawTable(ctx, game) {
   ctx.beginPath(); ctx.moveTo(0, 104); ctx.lineTo(FIELD.width, 104); ctx.stroke();
   ctx.fillStyle = ELEMENTS.frost.color;
   ctx.beginPath(); ctx.arc(40, 52, 22, 0, Math.PI * 2); ctx.fill();
-  drawArt(ctx, 'wall', 40, 52, 26, '#ffffff');
+  // Frost emblem (snowflake), the same glyph the title screen uses for
+  // Frost — not the 3x3 grid, which read as a placeholder.
+  drawArt(ctx, 'snow', 40, 52, 26, '#ffffff');
   ctx.fillStyle = PALETTE.ivory;
   ctx.font = `bold 17px ${FONT}`;
   ctx.textAlign = 'left';
@@ -615,6 +639,36 @@ export function drawOver(ctx, game) {
   ctx.fillStyle = 'rgba(10,14,30,0.72)';
   ctx.fillRect(0, 0, FIELD.width, FIELD.height);
   const won = game.winner === 'player';
+  if (won) {
+    // Victory celebration: static ember confetti around the modal, placed
+    // by a seeded shuffle of the duel seed so the frame is deterministic.
+    // Static on purpose — a frozen mid-animation burst would read as a
+    // glitch, and the shot renderer draws one frame only. Confetti stays
+    // in the margins, clear of the modal (340..940 x 150..570).
+    const rand = mulberry32((game.seed * 101 + 7) >>> 0);
+    const bands = [
+      { x0: 16, x1: 1264, y0: 16, y1: 138 },
+      { x0: 16, x1: 1264, y0: 582, y1: 704 },
+      { x0: 16, x1: 324, y0: 150, y1: 570 },
+      { x0: 956, x1: 1264, y0: 150, y1: 570 },
+    ];
+    for (let i = 0; i < 48; i += 1) {
+      const band = bands[i % bands.length];
+      const px = band.x0 + rand() * (band.x1 - band.x0);
+      const py = band.y0 + rand() * (band.y1 - band.y0);
+      const r = 3 + rand() * 4;
+      const kind = i % 3;
+      if (kind === 0) {
+        diamond(ctx, px, py, r, PALETTE.goldBright, null);
+      } else if (kind === 1) {
+        ctx.fillStyle = '#d9501e';
+        ctx.beginPath(); ctx.arc(px, py, r * 0.8, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.fillStyle = PALETTE.ivory;
+        ctx.beginPath(); ctx.arc(px, py, r * 0.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
   ctx.fillStyle = PALETTE.cardWhite;
   roundRect(ctx, 340, 150, 600, 420, 14);
   ctx.fill();
