@@ -17,7 +17,7 @@ function scalePoint(canvas, event) {
 }
 
 function laneAt(point) {
-  if (point.y < 72 || point.y > 388) return -1;
+  if (point.y < 112 || point.y > 428) return -1;
   for (let lane = 0; lane < 3; lane += 1) {
     if (point.x >= LANE_X[lane] && point.x <= LANE_X[lane] + LANE_W) return lane;
   }

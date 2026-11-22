@@ -130,7 +130,7 @@ export function playCard(game, side, handIndex, lane) {
     if (target) {
       if (damageCreature(game, foe, target, 3)) game.log.push(`Ember Bolt burns ${target.name}.`);
     } else {
-      damageLife(game, foe, 3, side === game.player, [220, 636, 1052][lane], foe === game.ai ? 88 : 392);
+      damageLife(game, foe, 3, side === game.player, [220, 636, 1052][lane], foe === game.ai ? 128 : 432);
     }
   } else if (card.id === 'frost-mend') {
     side.life = Math.min(LIFE_START, side.life + 5);
@@ -190,7 +190,7 @@ function attackPhase(game, attacker, defender, byPlayer) {
         if (died) game.log.push(`${target.name} falls in ${['Left', 'Centre', 'Right'][lane]} Lane.`);
       } else {
         // Life damage pins its floating text to the lane that dealt it.
-        damageLife(game, defender, atk, byPlayer, [220, 636, 1052][lane], defender === game.ai ? 88 : 392);
+        damageLife(game, defender, atk, byPlayer, [220, 636, 1052][lane], defender === game.ai ? 128 : 432);
         game.log.push(`${creature.name} strikes for ${atk}.`);
       }
       if (checkOver(game)) return;

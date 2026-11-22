@@ -163,13 +163,24 @@ export function drawArt(ctx, art, cx, cy, s, color) {
 }
 
 function drawCardBack(ctx, x, y, w, h) {
+  // A face-down card must read as a CARD at a glance: portrait, a gold
+  // outer edge, a second inner frame, and a small centred diamond.
+  // v2 shipped 52x48 near-square backs whose big diamond looked like
+  // three gold buttons in the top bar, not a hand of cards.
   roundRect(ctx, x, y, w, h, 8);
   ctx.fillStyle = PALETTE.panel;
   ctx.fill();
   ctx.strokeStyle = PALETTE.gold;
   ctx.lineWidth = 2;
   ctx.stroke();
-  diamond(ctx, x + w / 2, y + h / 2, Math.min(w, h) * 0.22, PALETTE.gold, null);
+  ctx.strokeStyle = 'rgba(217,164,65,0.55)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, x + 5, y + 5, w - 10, h - 10, 5);
+  ctx.stroke();
+  diamond(ctx, x + w / 2, y + h / 2, Math.min(w, h) * 0.17, PALETTE.gold, null);
+  ctx.fillStyle = PALETTE.gold;
+  ctx.beginPath(); ctx.arc(x + 10, y + 10, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + w - 10, y + h - 10, 2, 0, Math.PI * 2); ctx.fill();
 }
 
 export function drawCard(ctx, card, x, y, w, h, opts = {}) {
@@ -406,24 +417,26 @@ function drawHelp(ctx) {
 
 function drawLane(ctx, game, lane) {
   const x = LANE_X[lane];
+  // Lanes start at y=112, below the taller (104px) top bar that now
+  // holds Malachar's face-down hand as real portrait cards.
   ctx.fillStyle = lane % 2 === 0 ? PALETTE.lane : PALETTE.laneAlt;
-  roundRect(ctx, x, 72, LANE_W, 316, 10);
+  roundRect(ctx, x, 112, LANE_W, 316, 10);
   ctx.fill();
   ctx.fillStyle = PALETTE.ivory;
   ctx.font = `bold 13px ${FONT_UI}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(LANES[lane].toUpperCase(), x + 12, 84);
+  ctx.fillText(LANES[lane].toUpperCase(), x + 12, 124);
   const res = game.player.lanes[lane].some((c) => resonanceBonus(game.player, lane, c) > 0)
     || game.ai.lanes[lane].some((c) => resonanceBonus(game.ai, lane, c) > 0);
   if (res) {
     ctx.fillStyle = PALETTE.gold;
-    roundRect(ctx, x + LANE_W - 128, 74, 116, 20, 9);
+    roundRect(ctx, x + LANE_W - 128, 114, 116, 20, 9);
     ctx.fill();
     ctx.fillStyle = PALETTE.ink;
     ctx.font = `bold 11px ${FONT_UI}`;
     ctx.textAlign = 'center';
-    ctx.fillText('RESONANCE +1', x + LANE_W - 70, 84);
+    ctx.fillText('RESONANCE +1', x + LANE_W - 70, 124);
   }
   ctx.textAlign = 'center';
   // Opponent creatures on top, player creatures below: the table reads
@@ -431,19 +444,19 @@ function drawLane(ctx, game, lane) {
   game.ai.lanes[lane].forEach((creature, i) => {
     const cx = x + 14 + i * (BOARD_CARD.w + 10);
     const shown = { ...creature, atk: effectiveAtk(game, game.ai, lane, creature) };
-    drawCard(ctx, shown, cx, 102, BOARD_CARD.w, BOARD_CARD.h);
+    drawCard(ctx, shown, cx, 142, BOARD_CARD.w, BOARD_CARD.h);
   });
   game.player.lanes[lane].forEach((creature, i) => {
     const cx = x + 14 + i * (BOARD_CARD.w + 10);
     const shown = { ...creature, atk: effectiveAtk(game, game.player, lane, creature) };
     const selected = game.selected >= 0 && game.selectedLane === lane;
-    drawCard(ctx, shown, cx, 252, BOARD_CARD.w, BOARD_CARD.h, { selected });
+    drawCard(ctx, shown, cx, 292, BOARD_CARD.w, BOARD_CARD.h, { selected });
   });
   if (game.selected >= 0 && game.selectedLane === lane) {
     ctx.strokeStyle = PALETTE.goldBright;
     ctx.lineWidth = 3;
     ctx.setLineDash([8, 6]);
-    roundRect(ctx, x - 4, 240, LANE_W + 8, 152, 10);
+    roundRect(ctx, x - 4, 280, LANE_W + 8, 148, 10);
     ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -452,30 +465,33 @@ function drawLane(ctx, game, lane) {
 export function handCardRect(index, count) {
   const total = count * HAND_CARD.w + (count - 1) * 14;
   const x0 = (FIELD.width - total) / 2;
-  return { x: x0 + index * (HAND_CARD.w + 14), y: 404, w: HAND_CARD.w, h: HAND_CARD.h };
+  return { x: x0 + index * (HAND_CARD.w + 14), y: 444, w: HAND_CARD.w, h: HAND_CARD.h };
 }
 
 export function drawTable(ctx, game) {
   ctx.fillStyle = PALETTE.table;
   ctx.fillRect(0, 0, FIELD.width, FIELD.height);
-  // Top bar: Malachar, his intent, his face-down hand.
+  // Top bar: Malachar, his intent, his face-down hand. The bar is
+  // 104px tall so the opponent hand fits as real portrait cards
+  // (64x80) with a label underneath — not the 52x48 near-squares
+  // v2 shipped, whose big diamond read as three gold buttons.
   ctx.fillStyle = PALETTE.panel;
-  ctx.fillRect(0, 0, FIELD.width, 64);
+  ctx.fillRect(0, 0, FIELD.width, 104);
   ctx.strokeStyle = PALETTE.panelEdge;
-  ctx.beginPath(); ctx.moveTo(0, 64); ctx.lineTo(FIELD.width, 64); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, 104); ctx.lineTo(FIELD.width, 104); ctx.stroke();
   ctx.fillStyle = ELEMENTS.frost.color;
-  ctx.beginPath(); ctx.arc(40, 32, 22, 0, Math.PI * 2); ctx.fill();
-  drawArt(ctx, 'wall', 40, 32, 26, '#ffffff');
+  ctx.beginPath(); ctx.arc(40, 52, 22, 0, Math.PI * 2); ctx.fill();
+  drawArt(ctx, 'wall', 40, 52, 26, '#ffffff');
   ctx.fillStyle = PALETTE.ivory;
   ctx.font = `bold 17px ${FONT}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('MALACHAR — Frost Baron', 72, 22);
-  lifeBar(ctx, 72, 38, 150, game.ai.life);
-  kindleGem(ctx, 300, 32, game.ai.kindle);
+  ctx.fillText('MALACHAR — Frost Baron', 72, 42);
+  lifeBar(ctx, 72, 58, 150, game.ai.life);
+  kindleGem(ctx, 300, 52, game.ai.kindle);
   // Intent: what Malachar will do next, visible before his turn.
   ctx.fillStyle = '#2b3766';
-  roundRect(ctx, 380, 12, 420, 40, 10);
+  roundRect(ctx, 380, 32, 420, 40, 10);
   ctx.fill();
   ctx.strokeStyle = PALETTE.gold;
   ctx.lineWidth = 1.5;
@@ -483,15 +499,30 @@ export function drawTable(ctx, game) {
   ctx.fillStyle = PALETTE.goldBright;
   ctx.font = `bold 13px ${FONT_UI}`;
   ctx.textAlign = 'center';
-  ctx.fillText(`MALACHAR PLANS: ${game.intent.toUpperCase()}`, 590, 32);
-  // Opponent hand: face-down cards, counted by the backs themselves.
-  for (let i = 0; i < game.ai.hand.length; i += 1) {
-    drawCardBack(ctx, 860 + i * 62, 8, 52, 48);
+  ctx.fillText(`MALACHAR PLANS: ${game.intent.toUpperCase()}`, 590, 52);
+  // Opponent hand: one face-down portrait card per card in his hand,
+  // in a row above the lanes, centred on x=1000, clear of the intent
+  // bar (ends x=800) and the ROUND readout (right edge).
+  {
+    const n = game.ai.hand.length;
+    const bw = n <= 4 ? 64 : 48;
+    const bh = Math.round(bw * 1.25);
+    const gap = 10;
+    const total = n * bw + (n - 1) * gap;
+    const x0 = 1000 - total / 2;
+    const y0 = 8 + (80 - bh) / 2;
+    for (let i = 0; i < n; i += 1) {
+      drawCardBack(ctx, x0 + i * (bw + gap), y0, bw, bh);
+    }
+    ctx.fillStyle = PALETTE.muted;
+    ctx.font = `bold 10px ${FONT_UI}`;
+    ctx.textAlign = 'center';
+    ctx.fillText("MALACHAR'S HAND", 1000, 98);
   }
   ctx.fillStyle = PALETTE.muted;
   ctx.font = `bold 12px ${FONT_UI}`;
   ctx.textAlign = 'right';
-  ctx.fillText(`ROUND ${game.turn}`, 1256, 32);
+  ctx.fillText(`ROUND ${game.turn}`, 1256, 52);
   ctx.textAlign = 'center';
   // Lanes.
   for (let lane = 0; lane < 3; lane += 1) drawLane(ctx, game, lane);
